@@ -4,6 +4,7 @@ import de.greenman999.config.TradeFinderConfig;
 import net.minecraft.block.Block;
 import net.minecraft.block.LecternBlock;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.hud.ChatHud;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.command.argument.EntityAnchorArgumentType;
 import net.minecraft.entity.Entity;
@@ -19,8 +20,11 @@ import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.tag.EnchantmentTags;
 import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
 import net.minecraft.util.ActionResult;
@@ -102,12 +106,25 @@ public class TradeFinder {
         state = TradeState.CHECK;
         tries = 0;
 
-		if(TradeFinder.villager == null || TradeFinder.lecternPos == null) {
-            MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(Text.translatable("commands.tradefinder.start.not-selected").styled(style -> style.withColor(TextColor.fromFormatting(Formatting.RED))));
+        RegistryEntry<Enchantment> enchReg = null;
+        if (MinecraftClient.getInstance().world != null) {
+            enchReg = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.ENCHANTMENT).getEntry(enchantment);
+        }
+
+        ChatHud chat = MinecraftClient.getInstance().inGameHud.getChatHud();
+        MutableText errorMessage=null;
+        int minTradeValue;
+        if(
+                enchReg==null?(errorMessage=Text.translatable("commands.tradefinder.start.no-enchantment"))!=null:(minTradeValue=(TradeFinder.minLevel*3+2)*(enchReg.isIn(EnchantmentTags.DOUBLE_TRADE_PRICE)?2:1))==2147483648L||
+                        (TradeFinder.villager == null || TradeFinder.lecternPos == null) && (errorMessage=Text.translatable("commands.tradefinder.start.not-selected")) != null ||
+                        !enchReg.isIn(EnchantmentTags.TRADEABLE) && (errorMessage=Text.translatable("commands.tradefinder.start.tradeless",TradeFinder.enchantment.description().getString())) != null ||
+                        minTradeValue>maxBookPrice && (errorMessage=Text.translatable("commands.tradefinder.start.too-less",Enchantment.getName(RegistryEntry.of(TradeFinder.enchantment), TradeFinder.minLevel),minTradeValue,maxBookPrice)) != null
+        ) {
+            chat.addMessage(errorMessage.styled(style -> style.withColor(TextColor.fromFormatting(Formatting.RED))));
             stop();
             return 0;
         }
-        MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(Text.translatable("commands.tradefinder.start.success-single", Enchantment.getName(RegistryEntry.of(enchantment), minLevel), maxBookPrice).styled(style -> style.withColor(TextColor.fromFormatting(Formatting.GREEN))));
+        chat.addMessage(Text.translatable("commands.tradefinder.start.success-single", Enchantment.getName(RegistryEntry.of(enchantment), TradeFinder.minLevel), maxBookPrice).styled(style -> style.withColor(TextColor.fromFormatting(Formatting.GREEN))));
         return 1;
     }
 
